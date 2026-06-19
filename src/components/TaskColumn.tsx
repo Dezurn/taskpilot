@@ -1,14 +1,20 @@
 import { TaskCard } from "@/components/TaskCard";
-import type { Task } from "@/types/task";
+import type { Task, TaskStatus } from "@/types/task";
 
 type TaskColumnProps = {
   accentClassName: string;
+  isTaskPending: (taskId: string) => boolean;
+  onDeleteTask: (taskId: string) => void;
+  onUpdateTaskStatus: (taskId: string, status: TaskStatus) => void;
   tasks: Task[];
   title: string;
 };
 
 export function TaskColumn({
   accentClassName,
+  isTaskPending,
+  onDeleteTask,
+  onUpdateTaskStatus,
   tasks,
   title,
 }: TaskColumnProps) {
@@ -33,8 +39,19 @@ export function TaskColumn({
 
       <div className="flex flex-1 flex-col gap-3">
         {tasks.map((task) => (
-          <TaskCard key={task.id} task={task} />
+          <TaskCard
+            key={task.id}
+            isPending={isTaskPending(task.id)}
+            onDeleteTask={onDeleteTask}
+            onUpdateTaskStatus={onUpdateTaskStatus}
+            task={task}
+          />
         ))}
+        {tasks.length === 0 ? (
+          <div className="flex min-h-28 items-center justify-center border border-dashed border-slate-300 bg-white px-4 py-6 text-center text-sm text-slate-500">
+            No tasks in this column.
+          </div>
+        ) : null}
       </div>
     </section>
   );

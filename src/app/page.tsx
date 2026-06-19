@@ -1,4 +1,5 @@
 import { TaskBoard } from "@/components/TaskBoard";
+import Link from "next/link";
 
 export default function Home() {
   return (
@@ -23,11 +24,26 @@ export default function Home() {
               <p className="text-slate-500">Created locally</p>
             </div>
             <div className="border-l-4 border-amber-500 bg-white px-4 py-3 shadow-sm">
-              <p className="font-semibold text-slate-950">No database</p>
-              <p className="text-slate-500">State only</p>
+              <p className="font-semibold text-slate-950">API backed</p>
+              <p className="text-slate-500">Prisma tasks</p>
             </div>
           </div>
         </header>
+
+        <div className="flex flex-wrap justify-end gap-4">
+          <Link
+            className="text-sm font-semibold text-cyan-700 transition hover:text-cyan-900"
+            href="/daily-review"
+          >
+            Daily Review
+          </Link>
+          <Link
+            className="text-sm font-semibold text-cyan-700 transition hover:text-cyan-900"
+            href="/plan-vs-reality"
+          >
+            View Plan vs Reality
+          </Link>
+        </div>
 
         <TaskBoard />
       </div>

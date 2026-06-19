@@ -2,7 +2,10 @@ import { useState, type FormEvent, type ReactNode } from "react";
 import type { Task, TaskPriority, TaskStatus } from "@/types/task";
 
 type TaskFormProps = {
-  onCreateTask: (task: Task) => void;
+  isSubmitting: boolean;
+  onCreateTask: (
+    task: Omit<Task, "id" | "createdAt" | "updatedAt">,
+  ) => Promise<boolean>;
 };
 
 type TaskFormValues = {
@@ -38,10 +41,6 @@ const statusOptions: Array<{ label: string; value: TaskStatus }> = [
   { label: "Done", value: "DONE" },
 ];
 
-function createTaskId() {
-  return globalThis.crypto?.randomUUID?.() ?? `task-${Date.now()}`;
-}
-
 function validateTaskForm(values: TaskFormValues) {
   const errors: TaskFormErrors = {};
   const estimatedMinutes = Number(values.estimatedMinutes);
@@ -75,11 +74,11 @@ function validateTaskForm(values: TaskFormValues) {
   return errors;
 }
 
-export function TaskForm({ onCreateTask }: TaskFormProps) {
+export function TaskForm({ isSubmitting, onCreateTask }: TaskFormProps) {
   const [values, setValues] = useTaskFormValues();
   const [errors, setErrors] = useTaskFormErrors();
 
-  function handleSubmit(event: FormEvent<HTMLFormElement>) {
+  async function handleSubmit(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
 
     const nextErrors = validateTaskForm(values);
@@ -89,8 +88,7 @@ export function TaskForm({ onCreateTask }: TaskFormProps) {
       return;
     }
 
-    onCreateTask({
-      id: createTaskId(),
+    const wasCreated = await onCreateTask({
       title: values.title.trim(),
       description: values.description.trim(),
       deadline: values.deadline,
@@ -99,7 +97,9 @@ export function TaskForm({ onCreateTask }: TaskFormProps) {
       status: values.status as TaskStatus,
     });
 
-    setValues(initialValues);
+    if (wasCreated) {
+      setValues(initialValues);
+    }
   }
 
   return (
@@ -155,7 +155,7 @@ export function TaskForm({ onCreateTask }: TaskFormProps) {
               deadline: event.target.value,
             }))
           }
-          placeholder="Jun 25"
+          placeholder="2026-06-25"
           required
           type="text"
           value={values.deadline}
@@ -231,9 +231,10 @@ export function TaskForm({ onCreateTask }: TaskFormProps) {
       <div className="flex items-end sm:col-span-2 lg:col-span-2">
         <button
           className="h-10 w-full bg-slate-950 px-4 text-sm font-semibold text-white transition hover:bg-slate-800 focus:outline-none focus:ring-2 focus:ring-cyan-400 focus:ring-offset-2"
+          disabled={isSubmitting}
           type="submit"
         >
-          Add task
+          {isSubmitting ? "Adding..." : "Add task"}
         </button>
       </div>
     </form>

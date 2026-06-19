@@ -10,4 +10,6 @@ export type Task = {
   estimatedMinutes: number;
   priority: TaskPriority;
   status: TaskStatus;
+  createdAt?: string;
+  updatedAt?: string;
 };

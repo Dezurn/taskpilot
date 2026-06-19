@@ -1,14 +1,26 @@
 "use client";
 
-import { useMemo, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
+import { AIPlanner } from "@/components/AIPlanner";
+import { ScheduleGenerator } from "@/components/ScheduleGenerator";
 import { TaskForm } from "@/components/TaskForm";
 import { TaskColumn } from "@/components/TaskColumn";
 import type { Task, TaskStatus } from "@/types/task";
+
+type TaskDraft = Omit<Task, "id" | "createdAt" | "updatedAt">;
 
 type TaskColumnConfig = {
   title: string;
   status: TaskStatus;
   accentClassName: string;
+};
+
+type TaskListResponse = {
+  tasks: Task[];
+};
+
+type TaskResponse = {
+  task: Task;
 };
 
 const taskColumns: TaskColumnConfig[] = [
@@ -34,131 +46,65 @@ const taskColumns: TaskColumnConfig[] = [
   },
 ];
 
-const mockTasks: Task[] = [
-  {
-    id: "task-1",
-    title: "Map onboarding flow",
-    description:
-      "Outline the first-run checklist and identify the key empty states for new workspace owners.",
-    deadline: "Jun 24",
-    estimatedMinutes: 75,
-    priority: "HIGH",
-    status: "BACKLOG",
-  },
-  {
-    id: "task-2",
-    title: "Draft notification copy",
-    description:
-      "Write concise reminders for overdue tasks, daily planning, and completed milestone summaries.",
-    deadline: "Jun 27",
-    estimatedMinutes: 45,
-    priority: "MEDIUM",
-    status: "BACKLOG",
-  },
-  {
-    id: "task-3",
-    title: "Review keyboard shortcuts",
-    description:
-      "Define the first set of navigation and task creation shortcuts for the dashboard experience.",
-    deadline: "Jul 1",
-    estimatedMinutes: 35,
-    priority: "LOW",
-    status: "BACKLOG",
-  },
-  {
-    id: "task-4",
-    title: "Finalize dashboard layout",
-    description:
-      "Tune responsive column behavior and card density for mobile, tablet, and desktop breakpoints.",
-    deadline: "Today",
-    estimatedMinutes: 90,
-    priority: "HIGH",
-    status: "TODAY",
-  },
-  {
-    id: "task-5",
-    title: "Define task data shape",
-    description:
-      "Confirm the local TypeScript model before connecting future storage or server actions.",
-    deadline: "Today",
-    estimatedMinutes: 40,
-    priority: "MEDIUM",
-    status: "TODAY",
-  },
-  {
-    id: "task-6",
-    title: "Collect beta feedback",
-    description:
-      "Summarize notes from early users into usability issues and quick follow-up tasks.",
-    deadline: "Today",
-    estimatedMinutes: 55,
-    priority: "MEDIUM",
-    status: "TODAY",
-  },
-  {
-    id: "task-7",
-    title: "Build task card components",
-    description:
-      "Create reusable UI pieces for title, description, deadline, estimate, and priority metadata.",
-    deadline: "Jun 20",
-    estimatedMinutes: 65,
-    priority: "HIGH",
-    status: "IN_PROGRESS",
-  },
-  {
-    id: "task-8",
-    title: "Audit responsive spacing",
-    description:
-      "Check board gutters, card padding, and column height on compact laptop screens.",
-    deadline: "Jun 21",
-    estimatedMinutes: 50,
-    priority: "MEDIUM",
-    status: "IN_PROGRESS",
-  },
-  {
-    id: "task-9",
-    title: "Prepare release notes",
-    description:
-      "Capture the initial dashboard scope and known limitations for the first internal preview.",
-    deadline: "Jun 23",
-    estimatedMinutes: 30,
-    priority: "LOW",
-    status: "IN_PROGRESS",
-  },
-  {
-    id: "task-10",
-    title: "Create project shell",
-    description:
-      "Initialize the App Router project with TypeScript, Tailwind, linting, and base app files.",
-    deadline: "Jun 18",
-    estimatedMinutes: 120,
-    priority: "HIGH",
-    status: "DONE",
-  },
-  {
-    id: "task-11",
-    title: "Choose visual direction",
-    description:
-      "Settle on a quiet operational interface with clear scan paths and practical task metadata.",
-    deadline: "Jun 18",
-    estimatedMinutes: 35,
-    priority: "MEDIUM",
-    status: "DONE",
-  },
-  {
-    id: "task-12",
-    title: "Name the workspace",
-    description:
-      "Confirm TaskPilot as the product name for the initial planning dashboard.",
-    deadline: "Jun 17",
-    estimatedMinutes: 10,
-    priority: "LOW",
-    status: "DONE",
-  },
-];
+async function readApiError(response: Response, fallback: string) {
+  try {
+    const body = (await response.json()) as { error?: string };
+
+    return body.error ?? fallback;
+  } catch {
+    return fallback;
+  }
+}
 
 export function TaskBoard() {
-  const [tasks, setTasks] = useState<Task[]>(mockTasks);
+  const [tasks, setTasks] = useState<Task[]>([]);
+  const [isLoading, setIsLoading] = useState(true);
+  const [isCreating, setIsCreating] = useState(false);
+  const [pendingTaskId, setPendingTaskId] = useState<string | null>(null);
+  const [error, setError] = useState<string | null>(null);
+
+  useEffect(() => {
+    let isMounted = true;
+
+    async function loadTasks() {
+      setIsLoading(true);
+      setError(null);
+
+      try {
+        const response = await fetch("/api/tasks");
+
+        if (!response.ok) {
+          throw new Error(
+            await readApiError(response, "Failed to load tasks."),
+          );
+        }
+
+        const data = (await response.json()) as TaskListResponse;
+
+        if (isMounted) {
+          setTasks(data.tasks);
+        }
+      } catch (loadError) {
+        if (isMounted) {
+          setError(
+            loadError instanceof Error
+              ? loadError.message
+              : "Failed to load tasks.",
+          );
+        }
+      } finally {
+        if (isMounted) {
+          setIsLoading(false);
+        }
+      }
+    }
+
+    loadTasks();
+
+    return () => {
+      isMounted = false;
+    };
+  }, []);
 
   const totalTasks = tasks.length;
   const totalEstimatedMinutes = tasks.reduce(
@@ -184,8 +130,137 @@ export function TaskBoard() {
     );
   }, [tasks]);
 
-  function handleCreateTask(task: Task) {
-    setTasks((currentTasks) => [task, ...currentTasks]);
+  async function createTask(taskInput: TaskDraft) {
+    const response = await fetch("/api/tasks", {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json",
+      },
+      body: JSON.stringify(taskInput),
+    });
+
+    if (!response.ok) {
+      throw new Error(await readApiError(response, "Failed to create task."));
+    }
+
+    const data = (await response.json()) as TaskResponse;
+    return data.task;
+  }
+
+  async function handleCreateTask(taskInput: TaskDraft) {
+    setIsCreating(true);
+    setError(null);
+
+    try {
+      const task = await createTask(taskInput);
+      setTasks((currentTasks) => [task, ...currentTasks]);
+
+      return true;
+    } catch (createError) {
+      setError(
+        createError instanceof Error
+          ? createError.message
+          : "Failed to create task.",
+      );
+
+      return false;
+    } finally {
+      setIsCreating(false);
+    }
+  }
+
+  async function handleCreateTasks(taskInputs: TaskDraft[]) {
+    setIsCreating(true);
+    setError(null);
+
+    const createdTasks: Task[] = [];
+
+    try {
+      for (const taskInput of taskInputs) {
+        createdTasks.push(await createTask(taskInput));
+      }
+
+      setTasks((currentTasks) => [...createdTasks, ...currentTasks]);
+
+      return true;
+    } catch (createError) {
+      if (createdTasks.length > 0) {
+        setTasks((currentTasks) => [...createdTasks, ...currentTasks]);
+      }
+
+      setError(
+        createError instanceof Error
+          ? createError.message
+          : "Failed to create tasks.",
+      );
+
+      return false;
+    } finally {
+      setIsCreating(false);
+    }
+  }
+
+  async function handleUpdateTaskStatus(taskId: string, status: TaskStatus) {
+    setPendingTaskId(taskId);
+    setError(null);
+
+    try {
+      const response = await fetch(`/api/tasks/${taskId}`, {
+        method: "PATCH",
+        headers: {
+          "Content-Type": "application/json",
+        },
+        body: JSON.stringify({ status }),
+      });
+
+      if (!response.ok) {
+        throw new Error(
+          await readApiError(response, "Failed to update task."),
+        );
+      }
+
+      const data = (await response.json()) as TaskResponse;
+      setTasks((currentTasks) =>
+        currentTasks.map((task) => (task.id === taskId ? data.task : task)),
+      );
+    } catch (updateError) {
+      setError(
+        updateError instanceof Error
+          ? updateError.message
+          : "Failed to update task.",
+      );
+    } finally {
+      setPendingTaskId(null);
+    }
+  }
+
+  async function handleDeleteTask(taskId: string) {
+    setPendingTaskId(taskId);
+    setError(null);
+
+    try {
+      const response = await fetch(`/api/tasks/${taskId}`, {
+        method: "DELETE",
+      });
+
+      if (!response.ok) {
+        throw new Error(
+          await readApiError(response, "Failed to delete task."),
+        );
+      }
+
+      setTasks((currentTasks) =>
+        currentTasks.filter((task) => task.id !== taskId),
+      );
+    } catch (deleteError) {
+      setError(
+        deleteError instanceof Error
+          ? deleteError.message
+          : "Failed to delete task.",
+      );
+    } finally {
+      setPendingTaskId(null);
+    }
   }
 
   return (
@@ -199,23 +274,61 @@ export function TaskBoard() {
             Active work
           </h2>
           <p className="mt-1 text-sm text-slate-600">
-            {totalTasks} tasks, {totalEstimatedMinutes} estimated minutes.
+            {isLoading
+              ? "Loading tasks..."
+              : `${totalTasks} tasks, ${totalEstimatedMinutes} estimated minutes.`}
           </p>
         </div>
       </div>
 
-      <TaskForm onCreateTask={handleCreateTask} />
+      {error ? (
+        <div className="border-l-4 border-rose-500 bg-rose-50 px-4 py-3 text-sm text-rose-800">
+          {error}
+        </div>
+      ) : null}
 
-      <div className="grid gap-4 md:grid-cols-2 xl:grid-cols-4">
-        {taskColumns.map((column) => (
-          <TaskColumn
-            key={column.status}
-            accentClassName={column.accentClassName}
-            tasks={tasksByStatus[column.status]}
-            title={column.title}
-          />
-        ))}
-      </div>
+      <AIPlanner
+        isCreatingTasks={isCreating}
+        onCreateTasks={handleCreateTasks}
+      />
+
+      <ScheduleGenerator />
+
+      <TaskForm
+        isSubmitting={isCreating}
+        onCreateTask={handleCreateTask}
+      />
+
+      {isLoading ? (
+        <div className="grid gap-4 md:grid-cols-2 xl:grid-cols-4">
+          {taskColumns.map((column) => (
+            <section
+              key={column.status}
+              className={`min-h-[22rem] border-t-4 bg-slate-100 p-3 shadow-sm ${column.accentClassName}`}
+            >
+              <div className="h-4 w-28 animate-pulse bg-slate-200" />
+              <div className="mt-4 space-y-3">
+                <div className="h-32 animate-pulse bg-white ring-1 ring-slate-200" />
+                <div className="h-28 animate-pulse bg-white ring-1 ring-slate-200" />
+              </div>
+            </section>
+          ))}
+        </div>
+      ) : (
+        <div className="grid gap-4 md:grid-cols-2 xl:grid-cols-4">
+          {taskColumns.map((column) => (
+            <TaskColumn
+              key={column.status}
+              accentClassName={column.accentClassName}
+              isTaskPending={(taskId) => pendingTaskId === taskId}
+              onDeleteTask={handleDeleteTask}
+              onUpdateTaskStatus={handleUpdateTaskStatus}
+              tasks={tasksByStatus[column.status]}
+              title={column.title}
+            />
+          ))}
+        </div>
+      )}
     </section>
   );
 }
