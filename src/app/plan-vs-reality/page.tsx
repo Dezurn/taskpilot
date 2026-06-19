@@ -1,4 +1,3 @@
-import Link from "next/link";
 import { prisma } from "@/lib/prisma";
 
 export const dynamic = "force-dynamic";
@@ -97,9 +96,9 @@ export default async function PlanVsRealityPage() {
   }));
 
   return (
-    <main className="min-h-screen bg-slate-50 px-4 py-6 text-slate-950 sm:px-6 lg:px-8">
+    <main className="flex-1 px-4 py-6 text-slate-950 sm:px-6 lg:px-8">
       <div className="mx-auto flex w-full max-w-6xl flex-col gap-6">
-        <header className="flex flex-col gap-3 border-b border-slate-200 pb-6 sm:flex-row sm:items-end sm:justify-between">
+        <header className="border-b border-slate-200 pb-6">
           <div>
             <p className="text-sm font-medium uppercase tracking-[0.16em] text-cyan-700">
               TaskPilot
@@ -111,12 +110,6 @@ export default async function PlanVsRealityPage() {
               {formatDate(weekStart)} to {formatDate(new Date(weekEnd.getTime() - 1))}
             </p>
           </div>
-          <Link
-            className="text-sm font-semibold text-cyan-700 transition hover:text-cyan-900"
-            href="/"
-          >
-            Back to dashboard
-          </Link>
         </header>
 
         <section className="grid gap-4 sm:grid-cols-2 lg:grid-cols-4">

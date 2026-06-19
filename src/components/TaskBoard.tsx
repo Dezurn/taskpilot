@@ -1,8 +1,6 @@
 "use client";
 
-import { useEffect, useMemo, useState } from "react";
-import { AIPlanner } from "@/components/AIPlanner";
-import { ScheduleGenerator } from "@/components/ScheduleGenerator";
+import { useCallback, useEffect, useMemo, useState } from "react";
 import { TaskForm } from "@/components/TaskForm";
 import { TaskColumn } from "@/components/TaskColumn";
 import type { Task, TaskStatus } from "@/types/task";
@@ -56,6 +54,16 @@ async function readApiError(response: Response, fallback: string) {
   }
 }
 
+async function fetchTasks() {
+  const response = await fetch("/api/tasks");
+
+  if (!response.ok) {
+    throw new Error(await readApiError(response, "Failed to load tasks."));
+  }
+
+  return ((await response.json()) as TaskListResponse).tasks;
+}
+
 export function TaskBoard() {
   const [tasks, setTasks] = useState<Task[]>([]);
   const [isLoading, setIsLoading] = useState(true);
@@ -63,28 +71,33 @@ export function TaskBoard() {
   const [pendingTaskId, setPendingTaskId] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
 
+  const loadTasks = useCallback(async () => {
+    setIsLoading(true);
+    setError(null);
+
+    try {
+      setTasks(await fetchTasks());
+    } catch (loadError) {
+      setError(
+        loadError instanceof Error
+          ? loadError.message
+          : "Failed to load tasks.",
+      );
+    } finally {
+      setIsLoading(false);
+    }
+  }, []);
+
   useEffect(() => {
     let isMounted = true;
 
-    async function loadTasks() {
-      setIsLoading(true);
-      setError(null);
-
-      try {
-        const response = await fetch("/api/tasks");
-
-        if (!response.ok) {
-          throw new Error(
-            await readApiError(response, "Failed to load tasks."),
-          );
-        }
-
-        const data = (await response.json()) as TaskListResponse;
-
+    fetchTasks()
+      .then((loadedTasks) => {
         if (isMounted) {
-          setTasks(data.tasks);
+          setTasks(loadedTasks);
         }
-      } catch (loadError) {
+      })
+      .catch((loadError) => {
         if (isMounted) {
           setError(
             loadError instanceof Error
@@ -92,14 +105,12 @@ export function TaskBoard() {
               : "Failed to load tasks.",
           );
         }
-      } finally {
+      })
+      .finally(() => {
         if (isMounted) {
           setIsLoading(false);
         }
-      }
-    }
-
-    loadTasks();
+      });
 
     return () => {
       isMounted = false;
@@ -161,37 +172,6 @@ export function TaskBoard() {
         createError instanceof Error
           ? createError.message
           : "Failed to create task.",
-      );
-
-      return false;
-    } finally {
-      setIsCreating(false);
-    }
-  }
-
-  async function handleCreateTasks(taskInputs: TaskDraft[]) {
-    setIsCreating(true);
-    setError(null);
-
-    const createdTasks: Task[] = [];
-
-    try {
-      for (const taskInput of taskInputs) {
-        createdTasks.push(await createTask(taskInput));
-      }
-
-      setTasks((currentTasks) => [...createdTasks, ...currentTasks]);
-
-      return true;
-    } catch (createError) {
-      if (createdTasks.length > 0) {
-        setTasks((currentTasks) => [...createdTasks, ...currentTasks]);
-      }
-
-      setError(
-        createError instanceof Error
-          ? createError.message
-          : "Failed to create tasks.",
       );
 
       return false;
@@ -282,17 +262,20 @@ export function TaskBoard() {
       </div>
 
       {error ? (
-        <div className="border-l-4 border-rose-500 bg-rose-50 px-4 py-3 text-sm text-rose-800">
-          {error}
+        <div className="flex flex-col gap-3 border-l-4 border-rose-500 bg-rose-50 px-4 py-3 text-sm text-rose-800 sm:flex-row sm:items-center sm:justify-between">
+          <div>
+            <p className="font-semibold">Something needs attention</p>
+            <p className="mt-1">{error}</p>
+          </div>
+          <button
+            className="h-9 border border-rose-200 bg-white px-3 font-semibold text-rose-700 transition hover:bg-rose-100"
+            onClick={loadTasks}
+            type="button"
+          >
+            Retry
+          </button>
         </div>
       ) : null}
-
-      <AIPlanner
-        isCreatingTasks={isCreating}
-        onCreateTasks={handleCreateTasks}
-      />
-
-      <ScheduleGenerator />
 
       <TaskForm
         isSubmitting={isCreating}
@@ -300,7 +283,10 @@ export function TaskBoard() {
       />
 
       {isLoading ? (
-        <div className="grid gap-4 md:grid-cols-2 xl:grid-cols-4">
+        <div
+          aria-label="Loading task board"
+          className="grid gap-4 md:grid-cols-2 xl:grid-cols-4"
+        >
           {taskColumns.map((column) => (
             <section
               key={column.status}
@@ -313,6 +299,16 @@ export function TaskBoard() {
               </div>
             </section>
           ))}
+        </div>
+      ) : tasks.length === 0 ? (
+        <div className="border border-dashed border-slate-300 bg-white px-4 py-10 text-center shadow-sm">
+          <h3 className="text-lg font-semibold text-slate-950">
+            No tasks yet
+          </h3>
+          <p className="mx-auto mt-2 max-w-md text-sm leading-6 text-slate-600">
+            Add a task manually, or use AI Planner to turn a goal into tasks
+            before scheduling study sessions.
+          </p>
         </div>
       ) : (
         <div className="grid gap-4 md:grid-cols-2 xl:grid-cols-4">

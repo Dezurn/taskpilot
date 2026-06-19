@@ -49,7 +49,7 @@ export function TaskColumn({
         ))}
         {tasks.length === 0 ? (
           <div className="flex min-h-28 items-center justify-center border border-dashed border-slate-300 bg-white px-4 py-6 text-center text-sm text-slate-500">
-            No tasks in this column.
+            No tasks here yet.
           </div>
         ) : null}
       </div>

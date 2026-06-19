@@ -1,9 +1,8 @@
 import { TaskBoard } from "@/components/TaskBoard";
-import Link from "next/link";
 
 export default function Home() {
   return (
-    <main className="min-h-screen bg-slate-50 px-4 py-6 text-slate-950 sm:px-6 lg:px-8">
+    <main className="flex-1 px-4 py-6 text-slate-950 sm:px-6 lg:px-8">
       <div className="mx-auto flex w-full max-w-7xl flex-col gap-6">
         <header className="flex flex-col gap-4 border-b border-slate-200 pb-6 md:flex-row md:items-end md:justify-between">
           <div>
@@ -21,7 +20,7 @@ export default function Home() {
           <div className="grid grid-cols-2 gap-3 text-sm sm:flex">
             <div className="border-l-4 border-cyan-500 bg-white px-4 py-3 shadow-sm">
               <p className="font-semibold text-slate-950">Manual tasks</p>
-              <p className="text-slate-500">Created locally</p>
+              <p className="text-slate-500">Created by form</p>
             </div>
             <div className="border-l-4 border-amber-500 bg-white px-4 py-3 shadow-sm">
               <p className="font-semibold text-slate-950">API backed</p>
@@ -29,21 +28,6 @@ export default function Home() {
             </div>
           </div>
         </header>
-
-        <div className="flex flex-wrap justify-end gap-4">
-          <Link
-            className="text-sm font-semibold text-cyan-700 transition hover:text-cyan-900"
-            href="/daily-review"
-          >
-            Daily Review
-          </Link>
-          <Link
-            className="text-sm font-semibold text-cyan-700 transition hover:text-cyan-900"
-            href="/plan-vs-reality"
-          >
-            View Plan vs Reality
-          </Link>
-        </div>
 
         <TaskBoard />
       </div>
